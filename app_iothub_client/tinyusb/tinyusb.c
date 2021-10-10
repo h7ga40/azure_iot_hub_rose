@@ -181,7 +181,7 @@ static void netif_status_callback(struct netif *nif)
 		mdns_resp_netif_settings_changed(nif);
 #endif
 }
-
+#ifdef LAN_ADAPTOR
 static void init_lwip(void)
 {
   struct netif *netif = &netif_data;
@@ -190,7 +190,7 @@ static void init_lwip(void)
   IP_ADDR4(&ipaddr,  0,0,0,0);
   IP_ADDR4(&netmask, 0,0,0,0);
 
-  //lwip_init();
+  lwip_init();
 
   /* the lwip virtual MAC address must be different from the host's; to ensure this, we toggle the LSbit */
   netif->hwaddr_len = sizeof(tud_network_mac_address);
@@ -204,7 +204,7 @@ static void init_lwip(void)
 
   //netif_set_default(netif);
 }
-
+#endif
 bool tud_network_recv_cb(const uint8_t *src, uint16_t size)
 {
   /* this shouldn't happen, but if we get another packet before 
@@ -236,7 +236,7 @@ uint16_t tud_network_xmit_cb(uint8_t *dst, void *ref, uint16_t arg)
 
   return pbuf_copy_partial(p, dst, p->tot_len, 0);
 }
-
+#ifdef LAN_ADAPTOR
 static void service_traffic(void)
 {
   /* handle any packet received by tud_network_recv_cb() */
@@ -250,7 +250,7 @@ static void service_traffic(void)
 
   //sys_check_timeouts();
 }
-
+#endif
 void tud_network_init_cb(void)
 {
   /* if the network is re-initializing and we have a leftover packet, we must do a cleanup */
@@ -287,9 +287,10 @@ void setup(void)
   adns5050_sync(&mouse);
 
   tusb_init();
-
+#ifdef LAN_ADAPTOR
   /* initialize lwip */
-  //init_lwip();
+  init_lwip();
+#endif
 }
 
 void loop(void)
@@ -297,7 +298,9 @@ void loop(void)
     tud_task(); // tinyusb device task
 
     hid_task();
-    //service_traffic();
+#ifdef LAN_ADAPTOR
+    service_traffic();
+#endif
 }
 
 //--------------------------------------------------------------------+
@@ -522,33 +525,3 @@ void tinyusb_task(EXINF exinf)
 		loop();
 	}
 }
-
-#if CFG_TUD_MSC > 0
-bool tud_msc_test_unit_ready_cb(uint8_t lun)
-{
-	return false;
-}
-
-void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16], uint8_t product_rev[4])
-{
-}
-
-void tud_msc_capacity_cb(uint8_t lun, uint32_t* block_count, uint16_t* block_size)
-{
-}
-
-int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, uint16_t bufsize)
-{
-	return 0;
-}
-
-int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
-{
-	return 0;
-}
-
-int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t* buffer, uint32_t bufsize)
-{
-	return 0;
-}
-#endif

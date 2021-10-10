@@ -27,6 +27,10 @@
 
 enum
 {
+#ifdef LAN_ADAPTOR
+  ITF_NUM_CDC,
+  ITF_NUM_CDC_DATA,
+#endif
   ITF_NUM_KEYBOARD,
   ITF_NUM_MOUSE,
   ITF_NUM_TOTAL
