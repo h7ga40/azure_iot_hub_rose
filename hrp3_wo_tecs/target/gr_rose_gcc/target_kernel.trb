@@ -1,0 +1,9 @@
+# -*- coding: utf-8 -*-
+#
+#		パス2の生成スクリプトのターゲット依存部（Renesas Starter Kit+ for RX65N-2MB用）
+#
+
+#
+#  生成スクリプトのプロセッサ依存部
+#
+IncludeTrb("prc_kernel.trb")

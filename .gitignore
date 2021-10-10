@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+.vs/
+.metadata/
+.settings/
+Debug/
+!app_iothub_client/Debug/Makefile
+!hrp3_wo_tecs/Debug/Makefile

@@ -1,0 +1,10 @@
+# -*- coding: utf-8 -*-
+#
+#		パス3の生成スクリプトのターゲット依存部
+#
+# 
+
+#
+#  ターゲット非依存部のインクルード
+#
+IncludeTrb("kernel/kernel_check.trb")

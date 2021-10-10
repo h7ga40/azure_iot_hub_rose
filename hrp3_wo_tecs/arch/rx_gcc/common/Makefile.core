@@ -1,0 +1,42 @@
+#
+#		Makefileのコア依存部（RX用）
+#
+
+#
+#  GNU開発環境のターゲットアーキテクチャの定義
+#
+GCC_TARGET = rx-elf
+
+#
+#  コア依存部ディレクトリ名の定義
+#
+COREDIR = $(SRCDIR)/arch/$(CORE)_$(TOOL)/common
+
+#
+#  ツール依存部ディレクトリ名の定義 
+#
+TOOLDIR = $(SRCDIR)/arch/$(TOOL)
+
+#
+#  コンパイルオプション
+#
+INCLUDES += -I$(COREDIR) -I$(TOOLDIR)
+COPTS += -std=gnu99 -mcpu=rx64m -mlittle-endian-data -m64bit-doubles -DOMIT_INITIALIZE_SECTIONS
+
+#
+#  カーネルに関する定義
+#
+KERNEL_DIRS += $(COREDIR)
+KERNEL_ASMOBJS += core_support.o core_start.o kernel_cfg_asm.o
+KERNEL_COBJS += core_kernel_impl.o
+#SYSSVC_ASMOBJS += core_start.o
+
+#
+#  コンフィギュレータ関係の変数の定義
+#
+CFG_TABS := $(CFG_TABS) --symval-table $(COREDIR)/core_sym.def
+
+#
+#  オフセットファイル生成のための定義
+#
+TARGET_OFFSET_TRB = $(COREDIR)/core_offset.trb

@@ -1,0 +1,437 @@
+# -*- coding: utf-8 -*-
+#
+#   TOPPERS/HRP Kernel
+#       Toyohashi Open Platform for Embedded Real-Time Systems/
+#       Advanced Standard Profile Kernel
+# 
+#   Copyright (C) 2015-2019 by Embedded and Real-Time Systems Laboratory
+#               Graduate School of Information Science, Nagoya Univ., JAPAN
+# 
+#   上記著作権者は，以下の(1)〜(4)の条件を満たす場合に限り，本ソフトウェ
+#   ア（本ソフトウェアを改変したものを含む．以下同じ）を使用・複製・改
+#   変・再配布（以下，利用と呼ぶ）することを無償で許諾する．
+#   (1) 本ソフトウェアをソースコードの形で利用する場合には，上記の著作
+#       権表示，この利用条件および下記の無保証規定が，そのままの形でソー
+#       スコード中に含まれていること．
+#   (2) 本ソフトウェアを，ライブラリ形式など，他のソフトウェア開発に使
+#       用できる形で再配布する場合には，再配布に伴うドキュメント（利用
+#       者マニュアルなど）に，上記の著作権表示，この利用条件および下記
+#       の無保証規定を掲載すること．
+#   (3) 本ソフトウェアを，機器に組み込むなど，他のソフトウェア開発に使
+#       用できない形で再配布する場合には，次のいずれかの条件を満たすこ
+#       と．
+#     (a) 再配布に伴うドキュメント（利用者マニュアルなど）に，上記の著
+#         作権表示，この利用条件および下記の無保証規定を掲載すること．
+#     (b) 再配布の形態を，別に定める方法によって，TOPPERSプロジェクトに
+#         報告すること．
+#   (4) 本ソフトウェアの利用により直接的または間接的に生じるいかなる損
+#       害からも，上記著作権者およびTOPPERSプロジェクトを免責すること．
+#       また，本ソフトウェアのユーザまたはエンドユーザからのいかなる理
+#       由に基づく請求からも，上記著作権者およびTOPPERSプロジェクトを
+#       免責すること．
+# 
+#   本ソフトウェアは，無保証で提供されているものである．上記著作権者お
+#   よびTOPPERSプロジェクトは，本ソフトウェアに関して，特定の使用目的
+#   に対する適合性も含めて，いかなる保証も行わない．また，本ソフトウェ
+#   アの利用により直接的または間接的に生じたいかなる損害に関しても，そ
+#   の責任を負わない．
+# 
+
+#
+#		パス2の生成スクリプトのコア依存部（RX用）
+#
+
+#
+#  空のセクションに関する処理
+#
+$sectionMapFileName = SearchFilePath('section.map')
+$bOmitEmptySection = !$sectionMapFileName.nil?
+
+def TargetMemoryObject()
+  if $TOPPERS_ML_AUTO
+    # カーネルドメインに.system_stackセクションを登録する．
+    params = {}
+    params[:type] = :ATTSEC
+    params[:linker] = true
+    params[:domain] = $TDOM_KERNEL
+    params[:memreg] = $standardMemreg[$TDOM_KERNEL][:stdram]
+    params[:secname] = ".system_stack"
+    if defined?($targetMematrSstack)
+      params[:mematr] = $targetMematrSstack
+    else
+      params[:mematr] = $mematrNoinitSec
+    end
+    params[:acptn1] = $defaultAcptn[$TDOM_KERNEL]
+    params[:acptn2] = $defaultAcptn[$TDOM_KERNEL]
+    params[:acptn4] = $defaultAcptn[$TDOM_KERNEL]
+    $memObj[$lastMOKey += 1] = params
+
+    # カーネルドメインに.page_tableセクションを登録する．
+    params = {}
+    params[:type] = :ATTSEC
+    params[:linker] = true
+    params[:domain] = $TDOM_KERNEL
+    params[:memreg] = $standardMemreg[$TDOM_KERNEL][:stdrom]
+    params[:secname] = ".page_table"
+    params[:mematr] = $mematrRodataSec
+    params[:acptn1] = $defaultAcptn[$TDOM_KERNEL]
+    params[:acptn2] = $defaultAcptn[$TDOM_KERNEL]
+    params[:acptn4] = $defaultAcptn[$TDOM_KERNEL]
+    $memObj[$lastMOKey += 1] = params
+
+    # 無所属に.shared_codeセクションを登録する．
+    params = {}
+    params[:type] = :ATTSEC
+    params[:linker] = true
+    params[:domain] = $TDOM_NONE
+    params[:memreg] = $standardMemreg[$TDOM_NONE][:stdrom]
+    params[:secname] = ".shared_code"
+    params[:mematr] = $mematrTextSec
+    params[:acptn1] = $defaultAcptn[$TDOM_NONE]
+    params[:acptn2] = $defaultAcptn[$TDOM_NONE]
+    params[:acptn4] = $defaultAcptn[$TDOM_NONE]
+    $memObj[$lastMOKey += 1] = params
+  end
+end
+
+#
+#  有効なCPU例外ハンドラ番号
+#
+$EXCNO_VALID = [ 0, *(2..$INTNO_MAX_UNCONDITIONAL_TRAP), 20, 21, 23, 25, 30, 31 ]
+
+#
+#  ターゲット定義のCPU例外ハンドラ属性
+#
+$TARGET_EXCATR = $TA_DIRECT
+
+IncludeTrb("rx_mpu_lib.trb")
+
+#
+#  標準のセクションの定義
+#
+$defaultSections = [
+  { SECNAME: ".text",   MEMREG: :stdrom, MEMATR: $mematrTextSec },
+  { SECNAME: ".rodata", MEMREG: :stdrom, MEMATR: $mematrRodataSec },
+  { SECNAME: ".data",   MEMREG: :stdram, MEMATR: $mematrDataSec },
+  { SECNAME: ".bss",    MEMREG: :stdram, MEMATR: $mematrBssSec },
+  { SECNAME: ".noinit", MEMREG: :stdram, MEMATR: $mematrNoinitSec }
+]
+
+#
+#  ATT_SECで登録できないセクション名の定義
+#
+$targetStandardSecnameList = [
+  "COMMON", ".system_stack", ".page_table", ".shared_code"
+]
+
+#
+#  ユーザスタック領域のセクション名と確保方法
+#
+def SecnameUserStack(tskid)
+  return(".ustack_#{tskid}")
+end
+
+def AllocUserStack(stack, size, secname)
+  ustksz = (size + $CHECK_USTKSZ_ALIGN - 1) & ~($CHECK_USTKSZ_ALIGN - 1)
+  $kernelCfgC.add("/*static*/ STK_T #{stack}[COUNT_STK_T(#{ustksz})] " \
+					"__attribute__((section(\"#{secname}\"),nocommon));")
+  return("ROUND_STK_T(#{ustksz})")
+end
+
+#
+#  システムスタック領域の確保方法
+#
+def AllocSystemStack(stack, size, params)
+  $kernelCfgC.add("/*static*/ STK_T #{stack}[COUNT_STK_T(#{size})] " \
+					"__attribute__((section(\".system_stack\"),nocommon));")
+  return("ROUND_STK_T(#{size})")
+end
+
+#
+#  固定長メモリプール領域のセクション名と確保方法
+#
+def SecnameUserMempfix(mpfid)
+  return(".mpf_#{mpfid}")
+end
+
+def AllocUserMempfix(mpf, blkcnt, blksz, secname)
+  $kernelCfgC.add("static MPF_T #{mpf}[(#{blkcnt}) * COUNT_MPF_T(#{blksz})] " \
+					"__attribute__((section(\"#{secname}\"),nocommon));")
+end
+
+#
+#  ターゲット非依存部のインクルード
+#
+IncludeTrb("kernel/kernel.trb")
+
+# 
+# 割込み番号から割込み優先度及び属性を取り出すテーブル
+# 
+INTNO_RANGE = (0..$TMAX_INTNO)
+$kernelCfgC.comment_header("Interrupt Configuration Table")
+$kernelCfgC.add("const uint8_t _kernel_cfg_int_table[#{INTNO_RANGE.size}] = {")
+INTNO_RANGE.each do |intno|
+  if $cfgData[:CFG_INT].has_key?(intno)
+    intpri = "1"
+  else
+    intpri = "0"
+  end
+  $kernelCfgC.add("\t{ #{intpri} }, /* #{intno} */")  
+end
+$kernelCfgC.add2("};")
+
+if $TOPPERS_ML_AUTO
+  #
+  #  自動メモリ配置の場合
+  #
+
+  #
+  #  仮MPU情報の生成
+  #
+  $kernelMemC.add(<<EOS)
+#ifndef MPU_INFO_TABLE_SIZE
+#define MPU_INFO_TABLE_SIZE	(#{$nMaxMpuInfoTableSize}U)
+#endif /* MPU_INFO_TABLE_SIZE */
+
+const MPU_INFO _kernel_mpu_info_table[MPU_INFO_TABLE_SIZE] = {{0, 0}};
+const uint8_t _kernel_shared_mpu_num = 1U;
+const uint8_t _kernel_max_domain_mpu_num = 1U;
+EOS
+
+  #
+  #  リンカスクリプトの生成
+  #
+  $ldscript = GenFile.new("ldscript.ld")
+  $modnameReplace = {}
+  IncludeTrb("core_ldscript.trb")
+else
+  GenerateMpuInfoTable()
+end
+
+# 
+#  アセンブラ出力ファイル
+# 
+
+kernelCfgAsm = GenFile.new("kernel_cfg_asm.S")
+
+kernelCfgAsm.add(<<EOS)
+;
+;  GCC用出力ファイル
+;
+;  割込みベクタ及び割込みハンドラ定義
+;
+EOS
+
+# 
+#  共通関数の宣言
+# 
+
+kernelCfgAsm.add(<<EOS)
+	.text
+	.global	_start
+	.global	_kernel_interrupt
+	.global	_kernel_exception
+	.global	_kernel_service_call
+	.global	__kernel_default_exc_handler
+EOS
+
+#
+#  未登録の割込みのデバッグ設定
+#
+DEBUG_UNREG_INT = false
+if not DEBUG_UNREG_INT
+  kernelCfgAsm.add(<<EOS)
+	.global	__kernel_default_int_handler
+	.global	__kernel_default_int_handler_entry
+__kernel_default_int_handler_entry:
+	pushm	r1-r7								; スクラッチレジスタとr6-r7をタスクスタックへ退避
+	mov.l	#0FFFFFFFFH, r6						; 割込みハンドラ番号をr6へ
+	mov.l	#__kernel_default_int_handler, r7	; ハンドラのアドレスをr7へ
+	bra.a	_kernel_interrupt					; 共通ルーチンへ
+EOS
+end
+
+# 
+#  割込みハンドラの出力
+# 
+INHNO_RANGE = INTNO_RANGE
+INHNO_RANGE.each do |inhno|
+  inthdr = nil
+  if $cfgData[:DEF_INH].has_key?(inhno)
+    inh = $cfgData[:DEF_INH][inhno]
+    if inh[:inhatr] & $TA_NONKERNEL == 0
+      inthdr = "_#{inh[:inthdr]}"
+    end
+  elsif DEBUG_UNREG_INT
+    inthdr = "__kernel_default_int_handler"
+  end
+  if inthdr && inhno > $INTNO_MAX_UNCONDITIONAL_TRAP
+    kernelCfgAsm.add(<<EOS)
+	.global	#{inthdr}
+	.global	__kernel#{inthdr}_#{inhno}_entry
+__kernel#{inthdr}_#{inhno}_entry:
+	pushm	r1-r7						; スクラッチレジスタとr6-r7をタスクスタックへ退避
+	mov.l	##{inhno}, r6			; 割込みハンドラ番号をr6へ
+	mov.l	##{inthdr}, r7		; ハンドラのアドレスをr7へ
+	bra.a	_kernel_interrupt			; 共通ルーチンへ
+EOS
+  end
+end
+
+#
+# 未登録CPU例外ハンドラ入口処理
+#
+DEBUG_UNREG_EXC = false
+if not DEBUG_UNREG_EXC
+  kernelCfgAsm.add(<<EOS)
+	.global	__kernel_default_exc_handler_entry
+__kernel_default_exc_handler_entry:
+	pushm	r1-r7								; スクラッチレジスタとr6-r7をタスクスタックへ退避
+	mov.l	#0FFFFFFFFH, r6						; CPU例外ハンドラ番号をr6へ
+	mov.l	#__kernel_default_exc_handler, r7	; ハンドラのアドレスをr7へ
+	bra.a	_kernel_exception					; 共通ルーチンへ
+EOS
+end
+
+# 
+#  CPU例外ハンドラ入口処理
+#
+hExcEntry = {}
+$EXCNO_VALID.each do |excno|
+  exchdr = nil
+  if $cfgData[:DEF_EXC].has_key?(excno)
+    exc = $cfgData[:DEF_EXC][excno]
+    if exc[:excatr] & $TA_DIRECT != 0
+      hExcEntry[excno] = "_#{exc[:exchdr]}"
+      kernelCfgAsm.add("\t.global	#{hExcEntry[excno]}")
+    else
+      exchdr = "_#{exc[:exchdr]}"
+    end
+  elsif (excno == $EXCNO_SCYCOVR) || DEBUG_UNREG_EXC
+    exchdr = "__kernel_default_exc_handler"
+  else
+    hExcEntry[excno] = "__kernel_default_exc_handler_entry"
+  end
+
+  next if !exchdr
+
+  entry = "__kernel#{exchdr}_#{excno}_entry"
+  hExcEntry[excno] = entry
+
+  kernelCfgAsm.add(<<EOS)
+	.global	#{exchdr}
+	.global	#{entry}
+#{entry}:
+	pushm	r1-r7						; スクラッチレジスタとr6-r7をタスクスタックへ退避
+	mov.l	##{excno}, r6			; CPU例外ハンドラ番号をr6へ
+	mov.l	##{exchdr}, r7		; ハンドラのアドレスをr7へ
+	bra.a	_kernel_exception			; 共通ルーチンへ
+EOS
+end
+
+# 
+#  割込みベクタテーブル
+# 
+
+kernelCfgAsm.add(<<EOS)
+;
+;  割込みベクタテーブル
+;
+EOS
+
+INHNO_RANGE.each do |inhno|
+  if $cfgData[:DEF_INH].has_key?(inhno)
+    inh = $cfgData[:DEF_INH][inhno]
+    if inh[:inhatr] & $TA_NONKERNEL != 0
+      kernelCfgAsm.add("\t.global	_#{inh[:inthdr]}")
+    end
+  end
+end
+kernelCfgAsm.add
+
+kernelCfgAsm.add(<<EOS)
+	.section C$VECT, ROMDATA
+	.global VVECTOR_TOP
+VVECTOR_TOP:
+vvector_table:
+EOS
+INHNO_RANGE.each do |inhno|
+  if inhno == $SVC_SERVICE_CALL
+    kernelCfgAsm.add("\t.lword\t_kernel_service_call		; SVC_SERVICE_CALL")
+    next
+  end
+  if inhno <= $INTNO_MAX_UNCONDITIONAL_TRAP
+    kernelCfgAsm.add("\t.lword\t#{hExcEntry[inhno]}		; #{inhno}")
+    next
+  end
+  
+  inhhdr = "_kernel_default_int_handler_entry"
+  if $cfgData[:DEF_INH].has_key?(inhno)
+    inh = $cfgData[:DEF_INH][inhno]
+    if inh[:inhatr] & $TA_NONKERNEL == 0
+      inhhdr = "_kernel_#{inh[:inthdr]}_#{inhno}_entry"
+    else
+      inhhdr = inh[:inthdr]
+    end
+  elsif DEBUG_UNREG_INT
+    inhhdr = "_kernel__kernel_default_int_handler_#{inhno}_entry"
+  end
+  kernelCfgAsm.add("\t.lword\t_#{inhhdr}		; #{inhno}")
+end
+kernelCfgAsm.add
+
+# 
+#  例外ベクタテーブル
+# 
+
+kernelCfgAsm.append(<<EOS)
+;
+;  例外ベクタテーブル（EXTBのデフォルト位置FFFFFF80hに固定）
+;
+
+	.global	_fvector_table
+
+	.section .extbase, ROMDATA
+
+_fvector_table:
+	.word	 0FFFFFFFFH 	 ; Endian Select Register (little)
+	.space	 004H
+	.word	 0FFFFFFFFH 	 ; OFS1
+	.word	 0FFFFFFFFH 	 ; OFS0
+	.space	 010H
+	.word	 0FFFFFFFFH 	 ; 制御コード, IDコード1 - 3
+	.word	 0FFFFFFFFH 	 ; IDコード4 - 7
+	.word	 0FFFFFFFFH 	 ; IDコード8 - 11
+	.word	 0FFFFFFFFH 	 ; IDコード12 - 15
+EOS
+(12..30).each do |excnoVal|
+  if $cfgData[:DEF_EXC].has_key?(excnoVal)
+    kernelCfgAsm.append("	.word	 __kernel_#{$cfgData[:DEF_EXC][excnoVal][:exchdr]}_#{excnoVal}_entry")
+  elsif $EXCNO_VALID.include?(excnoVal)
+    kernelCfgAsm.append("	.word	 __kernel_default_exc_handler_entry")
+  else
+    kernelCfgAsm.append("	.word	 0")
+  end
+  kernelCfgAsm.add("		; #{excnoVal} ")
+end
+
+kernelCfgAsm.add("	.word	 _start		; 31:Reset")
+kernelCfgAsm.add2(".end")
+
+if $TOPPERS_ML_AUTO
+  #
+  #  仮のリンカスクリプトの生成
+  #
+  $ldscript = GenFile.new("cfg2_out.ld")
+  $modnameReplace = { "kernel_mem.o" => "kernel_mem2.o" }
+  IncludeTrb("core_ldscript.trb")
+else
+  #
+  #  手動メモリ配置の場合
+  #
+
+  #
+  #  メモリ保護単位に関する情報を生成する
+  #
+  GenerateMemProt()
+end

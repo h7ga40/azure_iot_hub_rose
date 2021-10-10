@@ -1,0 +1,42 @@
+# -*- coding: utf-8 -*-
+# 
+#		パス2の生成スクリプトのプロセッサ依存部（RX65N用）
+# 
+
+# 
+#  使用できる割込み番号とそれに対応する割込みハンドラ番号
+# 
+$INTNO_MAX_UNCONDITIONAL_TRAP = 15
+$INTNO_VALID = [ 16, 18, 21, 23, *(26..31), 34, 35, *(38..45),
+	*(50..55), *(58..90), 92, 93, *(95..117), *(120..255) ]
+$INHNO_VALID = $INTNO_VALID
+
+#
+#  ターゲット定義の割込み要求ライン属性
+#
+$TARGET_INTATR = $TA_NEGEDGE|$TA_POSEDGE|$TA_BOTHEDGE|$TA_LOWLEVEL
+
+# 
+#  生成スクリプトのコア依存部
+# 
+IncludeTrb("core_kernel.trb")
+
+#
+#  割込み要求ライン属性に関するターゲット依存のエラーチェック
+#
+$cfgData[:CFG_INT].each do |key, params|
+  target_intatr = params[:intatr] & $TARGET_INTATR
+  if $INT_IRQ_MIN <= key && key <= $INT_IRQ_MAX
+    # IRQ割込みの場合
+    #（TA_NEGEDGE等が同時に設定されている場合）
+    if target_intatr.to_s(2).count("1") > 1
+      error_illegal_sym("E_RSATR", params, :intatr, :intno)
+    end
+  else
+    # その他の割込みの場合
+    #（TA_NEGEDGE等がセットされている場合）
+    if target_intatr != 0
+      error_illegal_sym("E_RSATR", params, :intatr, :intno)
+    end
+  end
+end

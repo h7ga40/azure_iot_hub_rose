@@ -1,0 +1,55 @@
+# -*- coding: utf-8 -*-
+#
+#		オフセットファイル生成用Rubyテンプレート（RX用）
+#
+#
+
+#
+#  ターゲット非依存部のインクルード
+#
+IncludeTrb("kernel/genoffset.trb")
+
+#
+#  フィールドのオフセットの定義の生成
+#
+GenerateDefine("TCB_p_tinib   ", $offsetof_TCB_p_tinib)
+GenerateDefine("TCB_p_dominib ", $offsetof_TCB_p_dominib)
+GenerateDefine("TCB_sp        ", $offsetof_TCB_sp)
+GenerateDefine("TCB_pc        ", $offsetof_TCB_pc)
+GenerateDefine("TCB_svclevel  ", $offsetof_TCB_svclevel)
+GenerateDefine("TINIB_exinf   ", $offsetof_TINIB_exinf)
+GenerateDefine("TINIB_task    ", $offsetof_TINIB_task)
+GenerateDefine("TINIB_sstk    ", $offsetof_TINIB_sstk)
+GenerateDefine("TINIB_sstksz  ", $offsetof_TINIB_sstksz)
+GenerateDefine("TINIB_ustk    ", $offsetof_TINIB_ustk)
+GenerateDefine("TINIB_ustksz  ", $offsetof_TINIB_ustksz)
+GenerateDefine("TINIB_domid   ", $offsetof_TINIB_domid)
+GenerateDefine("SVCINIB_extsvc", $offsetof_SVCINIB_extsvc)
+GenerateDefine("SVCINIB_stksz ", $offsetof_SVCINIB_stksz)
+GenerateDefine("DOMINIB_domptn", $offsetof_DOMINIB_domptn)
+GenerateDefine("DOMINIB_use_mpu_num", $offsetof_DOMINIB_use_mpu_num)
+GenerateDefine("DOMINIB_mpu_area_info", $offsetof_DOMINIB_mpu_area_info)
+
+GenerateDefine("IPL_LOCK", $IPL_LOCK)
+GenerateDefine("TIPM_LOCK", $TIPM_LOCK)
+GenerateDefine("TIPM_LOCK_ALL", $TIPM_LOCK_ALL)
+GenerateDefine("EXC_GET_PSW_OFFSET", $EXC_GET_PSW_OFFSET)
+GenerateDefine("E_NOMEM", $E_NOMEM)
+GenerateDefine("E_RSFN", $E_RSFN)
+GenerateDefine("E_SYS", $E_SYS)
+GenerateDefine("PSW_I_MASK", $PSW_I_MASK)
+GenerateDefine("PSW_U_MASK", $PSW_U_MASK)
+GenerateDefine("PSW_IPL_MASK", $PSW_IPL_MASK)
+GenerateDefine("LOG_DSP_ENTER", $LOG_DSP_ENTER)
+GenerateDefine("LOG_DSP_LEAVE", $LOG_DSP_LEAVE)
+GenerateDefine("TFN_EXT_TSK", $TFN_EXT_TSK)
+GenerateDefine("TFN_EXT_KER", $TFN_EXT_KER)
+GenerateDefine("SVC_SERVICE_CALL", $SVC_SERVICE_CALL)
+GenerateDefine("TMIN_FNCD", $TMIN_FNCD)
+GenerateDefine("TDOM_KERNEL", $TDOM_KERNEL)
+GenerateDefine("MPU_RSPAGE0_ADDR", $MPU_RSPAGE0_ADDR)
+GenerateDefine("MPU_REPAGE0_ADDR", $MPU_REPAGE0_ADDR)
+GenerateDefine("MPU_RSPAGE1_ADDR", $MPU_RSPAGE1_ADDR)
+GenerateDefine("MPU_REPAGE1_ADDR", $MPU_REPAGE1_ADDR)
+GenerateDefine("RX_ACC_REGS_SIZE", $RX_ACC_REGS_SIZE)
+GenerateDefine("ICU_IERm_ADDR", $ICU_IERm_ADDR)

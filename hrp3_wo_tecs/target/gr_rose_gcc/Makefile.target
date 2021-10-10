@@ -1,0 +1,37 @@
+#
+#		Makefile のターゲット依存部（GR-ROSE用）
+#
+
+#
+#  ボード名, プロセッサ名，コア名，開発環境名の定義
+#
+BOARD = gr_rose
+PRC   = rx65n
+CORE  = rx
+TOOL  = gcc
+
+#
+#  確保するMPU情報テーブルのサイズに関する定義
+#
+#  デフォルトでは、最大可能サイズでビルドする
+#  以下の定義で確保するサイズを精確に設定すると、ROM消費を減らせる
+#
+#CDEFS := $(CDEFS) -DMPU_INFO_TABLE_SIZE=3
+
+#
+#  コンパイルオプション
+#
+INCLUDES := $(INCLUDES) -I$(TARGETDIR)
+LDFLAGS := -nostdlib $(LDFLAGS)
+CFG1_OUT_LDFLAGS := -nostdlib $(CFG1_OUT_LDFLAGS)
+
+#
+#  プロセッサ依存部
+#
+include $(SRCDIR)/arch/$(CORE)_$(TOOL)/$(PRC)/Makefile.prc
+
+#
+#  カーネルに関する定義
+#
+KERNEL_DIRS += $(TARGETDIR)
+KERNEL_COBJS += target_kernel_impl.o

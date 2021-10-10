@@ -1,0 +1,214 @@
+# -*- coding: utf-8 -*-
+#
+#   TOPPERS/HRP Kernel
+#       Toyohashi Open Platform for Embedded Real-Time Systems/
+#       High Reliable system Profile Kernel
+# 
+#   Copyright (C) 2016-2019 by Embedded and Real-Time Systems Laboratory
+#               Graduate School of Information Science, Nagoya Univ., JAPAN
+# 
+#   上記著作権者は，以下の(1)〜(4)の条件を満たす場合に限り，本ソフトウェ
+#   ア（本ソフトウェアを改変したものを含む．以下同じ）を使用・複製・改
+#   変・再配布（以下，利用と呼ぶ）することを無償で許諾する．
+#   (1) 本ソフトウェアをソースコードの形で利用する場合には，上記の著作
+#       権表示，この利用条件および下記の無保証規定が，そのままの形でソー
+#       スコード中に含まれていること．
+#   (2) 本ソフトウェアを，ライブラリ形式など，他のソフトウェア開発に使
+#       用できる形で再配布する場合には，再配布に伴うドキュメント（利用
+#       者マニュアルなど）に，上記の著作権表示，この利用条件および下記
+#       の無保証規定を掲載すること．
+#   (3) 本ソフトウェアを，機器に組み込むなど，他のソフトウェア開発に使
+#       用できない形で再配布する場合には，次のいずれかの条件を満たすこ
+#       と．
+#     (a) 再配布に伴うドキュメント（利用者マニュアルなど）に，上記の著
+#         作権表示，この利用条件および下記の無保証規定を掲載すること．
+#     (b) 再配布の形態を，別に定める方法によって，TOPPERSプロジェクトに
+#         報告すること．
+#   (4) 本ソフトウェアの利用により直接的または間接的に生じるいかなる損
+#       害からも，上記著作権者およびTOPPERSプロジェクトを免責すること．
+#       また，本ソフトウェアのユーザまたはエンドユーザからのいかなる理
+#       由に基づく請求からも，上記著作権者およびTOPPERSプロジェクトを
+#       免責すること．
+# 
+#   本ソフトウェアは，無保証で提供されているものである．上記著作権者お
+#   よびTOPPERSプロジェクトは，本ソフトウェアに関して，特定の使用目的
+#   に対する適合性も含めて，いかなる保証も行わない．また，本ソフトウェ
+#   アの利用により直接的または間接的に生じたいかなる損害に関しても，そ
+#   の責任を負わない．
+# 
+# 
+
+#
+#		RX MPU用情報テーブルの作成に関するライブラリ
+#
+
+#
+#  MPU領域の数とアライン単位
+#
+$TARGET_MPU_NUM = 8
+$TARGET_MPU_ALIGN = 16
+
+#
+#  保護ドメイン初期化コンテキストブロック
+#
+
+# カーネルドメインの保護ドメイン初期化コンテキストブロック
+$kernelDominictxb = "{ 0U, &_kernel_mpu_info_table[0] }"
+
+# 保護ドメイン初期化コンテキストブロック生成の前処理
+$aSharedMemObj = []
+$hDomainMemobj = {}
+$hDominictxb = {}
+$nMaxDomainMpuNum = 0
+$nTotalMpuInfoNum = 0
+$nMaxMpuInfoTableSize = nil
+def PrepareDominictxb(genFile)
+  # MPU情報数の最大可能値 = MPU領域数 * (ユーザ+共有)ドメイン数
+  $nMaxMpuInfoTableSize = $TARGET_MPU_NUM * ($udomainList.size + 1)
+
+  # タイムイベントヒープ領域用extern宣言の生成
+  aTmevtHeapList = ["kernel", "idle"]
+  $udomainList.each{|key|
+    aTmevtHeapList.push("#{$domData[key][:domid]}")
+  }
+  aTmevtHeapList.each{|suffix|
+     genFile.add("extern TMEVTN _kernel_tmevt_heap_#{suffix}[];");
+  }
+  genFile.add()
+  
+  if $TOPPERS_ML_AUTO
+    # 自動メモリ配置のパス2では、仮のMPU情報を生成するため、以降の処理はしない
+    return if $pass == "2"
+    memObjList = $sortedMemtopList
+  else
+    memObjList = $memObj.keys
+  end
+
+  # 共有、ユーザドメイン用のメモリオブジェクトのリストを作成
+  $udomainList.each{|key|
+    params = $domData[key]
+    domptn = (1 << (key - 1))
+    aMemObj = []
+    memObjList.each {|moKey|
+      moParams = $memObj[moKey]
+      if (moParams[:type] == :USTACK) || (moParams[:acptn1] == $TACP_KERNEL && moParams[:acptn2] == $TACP_KERNEL)
+        # ユーザスタック、またはカーネルドメイン専用の場合はskip
+        next
+      end
+      if ![:ATTMEM, :ATTMOD, :ATTSEC, :MPFAREA].include?(moParams[:type])
+        error_exit("not supported")
+      end
+      if (moParams[:acptn1] == $TACP_KERNEL || moParams[:acptn1] == $TACP_SHARED) && \
+        (moParams[:acptn2] == $TACP_KERNEL || moParams[:acptn2] == $TACP_SHARED)
+        $aSharedMemObj |= [moParams] # Add if not exist
+      elsif ((moParams[:acptn1] & domptn) != 0) || ((moParams[:acptn2] & domptn) != 0)
+        aMemObj.push(moParams)
+      end
+    }
+    $hDomainMemobj[key] = aMemObj
+  }
+  
+  # Dominictxbの生成
+  $nMaxDomainMpuNum = 0
+  $nTotalMpuInfoNum = $aSharedMemObj.size
+  $hDomainMemobj.each{|key, aMemObj|
+    if aMemObj.size > 0
+      $nMaxDomainMpuNum = [aMemObj.size, $nMaxDomainMpuNum].max
+      $hDominictxb[key] = "{ #{aMemObj.size}U, &_kernel_mpu_info_table[#{$nTotalMpuInfoNum}] }"
+      $nTotalMpuInfoNum += aMemObj.size
+    else
+      $hDominictxb[key] = "{ 0U, NULL }"
+    end
+  }
+  
+  # エラーチェック
+  if $nMaxDomainMpuNum + $aSharedMemObj.size + 1 > $TARGET_MPU_NUM
+    error_exit("MPU region number exceeds the limit")
+  end
+  if $TOPPERS_ML_AUTO
+    $MPU_INFO_TABLE_SIZE = $nMaxMpuInfoTableSize if $MPU_INFO_TABLE_SIZE.nil?
+    if $nTotalMpuInfoNum > $MPU_INFO_TABLE_SIZE
+      error_exit("increase MPU_INFO_TABLE_SIZE (must >= #{$nTotalMpuInfoNum}) and build again")
+    else
+      # MPU情報テーブルの使用状況の表示
+      STDERR.puts("== #{$nTotalMpuInfoNum}/#{$MPU_INFO_TABLE_SIZE} of the allocated MPU info table is used ==")
+    end
+  end
+end
+
+# 保護ドメイン初期化コンテキストブロックの生成
+def GenerateDominictxb(key, params)
+  if $TOPPERS_ML_AUTO && $pass == "2"
+    # 自動メモリ配置のパス2では、仮の情報を生成する
+    return "{ 0U, NULL }"
+  else
+    return $hDominictxb[key]
+  end
+end
+
+#
+#  GCC用MPU情報の作成（自動メモリ配置）
+#
+def GenerateMpuAreaInfo(aMemObj, acptn)
+  aMemObj.each{|params|
+    rspage = params[:baseaddr].to_i
+    repage = params[:maendaddr] - $TARGET_MPU_ALIGN
+    if repage < 0
+      repage += 0x100000000
+    end
+    if (rspage & ($TARGET_MPU_ALIGN - 1)) != 0
+      error_ercd("E_PAR", params, \
+					"%%base in %apiname is not aligned to the page size")
+    end
+    if (repage & ($TARGET_MPU_ALIGN - 1)) != 0
+      error_ercd("E_PAR", params, \
+					"%%size in %apiname is not aligned to the page size")
+    end
+    repage |= 0x1
+    if ((params[:acptn1] & acptn) != 0) && ((params[:mematr] & $TA_NOWRITE) == 0)
+      repage |= (1 << 2)
+    end
+    if ((params[:acptn2] & acptn) != 0)
+      if ((params[:mematr] & $TA_EXEC) != 0)
+        repage |= (1 << 1)
+      end
+      if ((params[:mematr] & $TA_NOREAD) == 0)
+        repage |= (1 << 3)
+      end
+    end
+    $kernelMemC.add("\t{ 0x#{rspage.to_s(16)}U, 0x#{repage.to_s(16)}U }, /* rspage, repage */")  
+  }
+end
+def GenerateMpuInfoTable
+  if $TOPPERS_ML_AUTO
+    $kernelMemC.add(<<EOS)
+#ifndef MPU_INFO_TABLE_SIZE
+#define MPU_INFO_TABLE_SIZE	(#{$nMaxMpuInfoTableSize}U)
+#endif /* MPU_INFO_TABLE_SIZE */
+const MPU_INFO _kernel_mpu_info_table[MPU_INFO_TABLE_SIZE] = {
+EOS
+  else
+    $kernelMemC.add("const MPU_INFO _kernel_mpu_info_table[#{$nTotalMpuInfoNum}] = {")
+  end
+  if $aSharedMemObj.size > 0
+    $kernelMemC.add("\t/* Shared: */")
+    GenerateMpuAreaInfo($aSharedMemObj, $acptnShared)
+  end
+  $hDomainMemobj.each{|key, aMemObj|
+    if aMemObj.size > 0
+      $kernelMemC.add("\t/* #{$domData[key][:domid]}: */")
+      domptn = (1 << (key - 1))
+      GenerateMpuAreaInfo(aMemObj, domptn)
+    end
+  }
+  $kernelMemC.add2("};")
+  $kernelMemC.add("const uint8_t _kernel_shared_mpu_num = #{$aSharedMemObj.size}U;")
+  $kernelMemC.add("const uint8_t _kernel_max_domain_mpu_num = #{$nMaxDomainMpuNum}U;")
+end
+
+#
+#  メモリオブジェクトの先頭／終了ラベルの宣言のマクロを生成
+#
+def GenerateDeclareLabel(genFile, label)
+  genFile.add("#define #{label} ((void*)#{sprintf("0x%08x", SYMBOL(label))}U)")
+end
