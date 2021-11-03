@@ -148,12 +148,20 @@ target_initialize(void)
 	prc_initialize();
 
 	/*
-	 * SCI8用ポート設定
+	 * SCI1用ポート設定
 	 */
 
 	/* ポートP30をRXD1に, ポートP26をTXD1 */
-	sil_wrb_mem((void *)PORT2_PMR_ADDR, sil_reb_mem((void *)PORT2_PMR_ADDR) | 0x40);
-	sil_wrb_mem((void *)PORT3_PMR_ADDR, sil_reb_mem((void *)PORT3_PMR_ADDR) | 0x01);
+	sil_wrb_mem((void *)PORT2_PMR_ADDR, sil_reb_mem((void *)PORT2_PMR_ADDR) | (1 << 6));
+	sil_wrb_mem((void *)PORT3_PMR_ADDR, sil_reb_mem((void *)PORT3_PMR_ADDR) | (1 << 0));
+
+	/* ポートP25をRXD3に, ポートP23をTXD3(ESP用) */
+	sil_wrb_mem((void *)PORT2_PMR_ADDR, sil_reb_mem((void *)PORT2_PMR_ADDR) | (1 << 5));
+	sil_wrb_mem((void *)PORT2_PMR_ADDR, sil_reb_mem((void *)PORT2_PMR_ADDR) | (1 << 3));
+
+	/* プルアップ制御レジスタ(PCR)の設定 P25(RXD3)を入力プルアップ抵抗有効にする */
+	sil_wrb_mem((void *)(PORT2_PCR_ADDR),
+					sil_reb_mem((void *)(PORT2_PCR_ADDR)) | PORTn_PDR_B5_BIT);
 
 	/* データディレクションレジスタ(PDR)の設定 P30(RXD1)を入力ポートにする */
 	sil_wrb_mem((void *)(PORT3_PDR_ADDR),
@@ -162,6 +170,38 @@ target_initialize(void)
 	/* データディレクションレジスタ(PDR)の設定 P26(TXD1)を出力ポートにする */
 	sil_wrb_mem((void *)(PORT2_PDR_ADDR),
 					sil_reb_mem((void *)(PORT2_PDR_ADDR)) | PORTn_PDR_B6_BIT);
+
+	/* データディレクションレジスタ(PDR)の設定 P25(RXD3)を入力ポートにする */
+	sil_wrb_mem((void *)(PORT2_PDR_ADDR),
+					sil_reb_mem((void *)(PORT2_PDR_ADDR)) & ~PORTn_PDR_B5_BIT);
+
+	/* データディレクションレジスタ(PDR)の設定 P23(TXD3)を出力ポートにする */
+	sil_wrb_mem((void *)(PORT2_PDR_ADDR),
+					sil_reb_mem((void *)(PORT2_PDR_ADDR)) | PORTn_PDR_B3_BIT);
+
+	/* P24(ESP_EN)をLowにする */
+	sil_wrb_mem((void *)(PORT2_PODR_ADDR),
+					sil_reb_mem((void *)(PORT2_PODR_ADDR)) & ~PORTn_PODR_B4_BIT);
+
+	/* P27(ESP_IO0)をHighにする(実行モード) */
+	sil_wrb_mem((void *)(PORT2_PODR_ADDR),
+					sil_reb_mem((void *)(PORT2_PODR_ADDR)) | PORTn_PODR_B7_BIT);
+
+	/* P31(ESP_IO15)をLowにする(実行モード) */
+	sil_wrb_mem((void *)(PORT3_PODR_ADDR),
+					sil_reb_mem((void *)(PORT3_PODR_ADDR)) & ~PORTn_PODR_B1_BIT);
+
+	/* データディレクションレジスタ(PDR)の設定 P24(ESP_EN)を出力ポートにする */
+	sil_wrb_mem((void *)(PORT2_PDR_ADDR),
+					sil_reb_mem((void *)(PORT2_PDR_ADDR)) | PORTn_PDR_B4_BIT);
+
+	/* データディレクションレジスタ(PDR)の設定 P27(ESP_IO0)を出力ポートにする */
+	sil_wrb_mem((void *)(PORT2_PDR_ADDR),
+					sil_reb_mem((void *)(PORT2_PDR_ADDR)) | PORTn_PDR_B7_BIT);
+
+	/* データディレクションレジスタ(PDR)の設定 P31(ESP_IO15)を出力ポートにする */
+	sil_wrb_mem((void *)(PORT3_PDR_ADDR),
+					sil_reb_mem((void *)(PORT3_PDR_ADDR)) | PORTn_PDR_B1_BIT);
 
 	/* 書き込みプロテクトレジスタの設定 PFSWEビットへの書き込みを許可 */
 	sil_wrb_mem((void *)(MPC_PWPR_ADDR), 0x00);
@@ -172,6 +212,11 @@ target_initialize(void)
 	sil_wrb_mem((void *)(MPC_P30PFS_ADDR), 0x0a);
 	/* 端子機能制御レジスタ P26をTXD1とする */
 	sil_wrb_mem((void *)(MPC_P26PFS_ADDR), 0x0a);
+
+	/* 端子機能制御レジスタ P25をRXD3とする */
+	sil_wrb_mem((void *)(MPC_P25PFS_ADDR), 0x0a);
+	/* 端子機能制御レジスタ P23をTXD3とする */
+	sil_wrb_mem((void *)(MPC_P23PFS_ADDR), 0x0a);
 
 	/* 書き込みプロテクトレジスタの設定 書き込みを禁止 */
 	sil_wrb_mem((void *)(MPC_PWPR_ADDR), MPC_PWPR_B0WI_BIT);

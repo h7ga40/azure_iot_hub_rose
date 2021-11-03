@@ -127,6 +127,7 @@
 #include "netif/etharp.h"
 #include "lwip/inet.h"
 #include "esp_at_socket.h"
+#include "iodefine.h"
 
 uint8_t mac_addr[ETHARP_HWADDR_LEN] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc };
 err_t ethernetif_init(struct netif *netif);
@@ -321,6 +322,7 @@ int usrcmd_ping(int argc, char **argv);
 int usrcmd_dhcp4c(int argc, char **argv);
 int usrcmd_dnsc(int argc, char **argv);
 int usrcmd_ntpc(int argc, char **argv);
+int set_wifi_main(int argc, char **argv);
 static int_t mode_func(int argc, char **argv);
 static int_t count_func(int argc, char **argv);
 static int_t at_func(int argc, char **argv);
@@ -333,6 +335,7 @@ static const cmd_table_t cmdlist[] = {
 	{"atmode", "AT echo mode", mode_func},
 	{"atcount", "AT recived count", count_func},
 	{"at", "AT command", at_func},
+	{"set_wifi", "Set ssid pwd", set_wifi_main},
 	{"iothub", "Asure IoT Hub Client", iothub_client_main},
 	{"dps_csgen", "Generate a connection string", dps_csgen_main},
 	{"set_cs", "Set connection string", set_cs_main},
@@ -459,14 +462,14 @@ static int_t at_func(int argc, char **argv)
 	ER_UINT result;
 	int  caps = 1;
 
-	for(i = 0 ; i < argc ; i++){
+	for(i = 1 ; i < argc ; i++){
 		arg_count++;
 		arg_count += strlen(argv[i]);
 	}
 	*p++ = 'A';
 	*p++ = 'T';
 	if(arg_count > BASE_CMD_LEN){
-		for(i = 0 ; i < argc ; i++){
+		for(i = 1 ; i < argc ; i++){
 			s = argv[i];
 			*p++ = '+';
 			while(*s != 0){
@@ -529,6 +532,11 @@ void esp_at_task(EXINF exinf)
 		slp_tsk();
 	}
 	SVC_PERROR(serial_ctl_por(AT_PORTID, 0));
+
+	/* P24(ESP_EN)をHighにする */
+	sil_wrb_mem((void *)(&PORT2.PODR.BYTE),
+					sil_reb_mem((void *)(&PORT2.PODR.BYTE)) | (1 << 4));
+
 	while(dlen < 500000){
 		serial_ref_por(AT_PORTID, &k_rpor);
 		len = k_rpor.reacnt;

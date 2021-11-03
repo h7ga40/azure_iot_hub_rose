@@ -54,6 +54,12 @@
 #define INT_TXI1     61
 #define INT_IRQ_MIN  64
 #define INT_IRQ_MAX  79
+#define INT_RXI3     80
+#define INT_TXI3     81
+#define INT_RXI4     82
+#define INT_TXI4     83
+#define INT_RXI5     84
+#define INT_TXI5     85
 #define INT_RXI6     86
 #define INT_TXI6     87
 #define INT_RXI8     100
@@ -106,6 +112,7 @@
 #define SYSTEM_MSTPCRB_ADDR			( ( volatile uint32_t __evenaccess * )0x00080014 )
 #define SYSTEM_MSTPCRB_MSTPB15_BIT	( 1UL << 15U )
 #define SYSTEM_MSTPCRB_MSTPB25_BIT	( 1UL << 25U )
+#define SYSTEM_MSTPCRB_MSTPB28_BIT	( 1UL << 28U )
 #define SYSTEM_MSTPCRB_MSTPB30_BIT	( 1UL << 30U )
 #define SYSTEM_MSTPCRC_ADDR			( ( volatile uint32_t __evenaccess * )0x00080018 )
 #define SYSTEM_MSTPCRC_MSTPC27_BIT	( 1UL << 27U )
@@ -160,6 +167,10 @@
 #define SCI1_TDR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A023 )
 #define SCI1_SMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A020 )
 #define SCI1_SCR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A022 )
+#define SCI3_RDR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A065 )
+#define SCI3_TDR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A063 )
+#define SCI3_SMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A060 )
+#define SCI3_SCR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A062 )
 #define SCI6_RDR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A0C5 )
 #define SCI6_TDR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A0C3 )
 #define SCI6_SMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A0C0 )
@@ -174,6 +185,7 @@
 #define SCIn_SCR_RIE_BIT		( 1UL << 6U )
 #define SCIn_SCR_TIE_BIT		( 1UL << 7U )
 #define SCI1_SSR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A024 )
+#define SCI3_SSR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A064 )
 #define SCI6_SSR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A0C4 )
 #define SCI8_SSR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A104 )
 #define SCIn_SSR_TEND_BIT		( 1UL << 2U )
@@ -182,6 +194,9 @@
 #define SCI1_SCMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A026 )
 #define SCI1_BRR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A021 )
 #define SCI1_SEMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A027 )
+#define SCI3_SCMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A066 )
+#define SCI3_BRR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A061 )
+#define SCI3_SEMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A067 )
 #define SCI6_SCMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A0C6 )
 #define SCI6_BRR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A0C1 )
 #define SCI6_SEMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008A0C7 )
@@ -197,6 +212,8 @@
 #define MPC_PWPR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C11F )
 #define MPC_PWPR_PFSWE_BIT		( 1UL << 6U )
 #define MPC_PWPR_B0WI_BIT		( 1UL << 7U )
+#define MPC_P23PFS_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C153 )
+#define MPC_P25PFS_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C155 )
 #define MPC_P26PFS_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C156 )
 #define MPC_P30PFS_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C158 )
 #define MPC_PA3PFS_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C193 )
@@ -237,6 +254,19 @@
 #define PORTB_PMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C06B )
 #define PORTF_PMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C06F )
 #define PORTJ_PMR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C072 )
+
+#define PORT2_PODR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C022 )
+#define PORT3_PODR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C023 )
+#define PORTn_PODR_B0_BIT		( 1UL << 0U )
+#define PORTn_PODR_B1_BIT		( 1UL << 1U )
+#define PORTn_PODR_B2_BIT		( 1UL << 2U )
+#define PORTn_PODR_B3_BIT		( 1UL << 3U )
+#define PORTn_PODR_B4_BIT		( 1UL << 4U )
+#define PORTn_PODR_B5_BIT		( 1UL << 5U )
+#define PORTn_PODR_B6_BIT		( 1UL << 6U )
+#define PORTn_PODR_B7_BIT		( 1UL << 7U )
+
+#define PORT2_PCR_ADDR			( ( volatile uint8_t __evenaccess * )0x0008C0C2 )
 
 /*
  * リアルタイムクロック

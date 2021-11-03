@@ -57,8 +57,8 @@
  */
 #define SCI1_SIO_ID (1)
 #define SCI1_INTPRI (-4)
-#define SCI6_SIO_ID (2)
-#define SCI6_INTPRI (-4)
+#define SCI3_SIO_ID (2)
+#define SCI3_INTPRI (-4)
 
 #include "prc_serial.h"
 
