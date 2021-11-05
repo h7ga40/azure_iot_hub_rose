@@ -64,6 +64,8 @@ typedef struct sio_port_initialization_block {
 	uint8_t				tx_intno;		/* 送信（データエンプティ）割り込み番号 */
 	uint8_t				rx_intno;		/* 受信（データフル）割り込み番号 */
 	uint32_t			mstpcr_offset;	/* MSTPCRの対応するビットオフセット */
+	volatile uint32_t	*erireg;		/* エラー割り込み許可レジスタ */
+	uint8_t				eribit;			/* エラー割り込み許可ビット */
 } SIOPINIB;
 
 #if defined(SCI0_SIO_ID)
@@ -79,7 +81,9 @@ static const SIOPINIB siopinib_sci0 = {
 	(volatile uint8_t *)SCI0_SSR_ADDR,
 	INT_TXI0,
 	INT_RXI0,
-	SYSTEM_MSTPCRB_MSTPB31_BIT
+	SYSTEM_MSTPCRB_MSTPB31_BIT,
+	ICU_GENBL0_ADDR,
+	1
 };
 #endif
 
@@ -96,7 +100,9 @@ static const SIOPINIB siopinib_sci1 = {
 	(volatile uint8_t *)SCI1_SSR_ADDR,
 	INT_TXI1,
 	INT_RXI1,
-	SYSTEM_MSTPCRB_MSTPB30_BIT
+	SYSTEM_MSTPCRB_MSTPB30_BIT,
+	ICU_GENBL0_ADDR,
+	3
 };
 #endif
 
@@ -113,7 +119,9 @@ static const SIOPINIB siopinib_sci2 = {
 	(volatile uint8_t *)SCI2_SSR_ADDR,
 	INT_TXI2,
 	INT_RXI2,
-	SYSTEM_MSTPCRB_MSTPB29_BIT
+	SYSTEM_MSTPCRB_MSTPB29_BIT,
+	ICU_GENBL0_ADDR,
+	5
 };
 #endif
 
@@ -130,7 +138,9 @@ static const SIOPINIB siopinib_sci3 = {
 	(volatile uint8_t *)SCI3_SSR_ADDR,
 	INT_TXI3,
 	INT_RXI3,
-	SYSTEM_MSTPCRB_MSTPB28_BIT
+	SYSTEM_MSTPCRB_MSTPB28_BIT,
+	ICU_GENBL0_ADDR,
+	7
 };
 #endif
 
@@ -147,7 +157,9 @@ static const SIOPINIB siopinib_sci4 = {
 	(volatile uint8_t *)SCI4_SSR_ADDR,
 	INT_TXI4,
 	INT_RXI4,
-	SYSTEM_MSTPCRB_MSTPB27_BIT
+	SYSTEM_MSTPCRB_MSTPB27_BIT,
+	ICU_GENBL0_ADDR,
+	9
 };
 #endif
 
@@ -164,7 +176,9 @@ static const SIOPINIB siopinib_sci5 = {
 	(volatile uint8_t *)SCI5_SSR_ADDR,
 	INT_TXI5,
 	INT_RXI5,
-	SYSTEM_MSTPCRB_MSTPB26_BIT
+	SYSTEM_MSTPCRB_MSTPB26_BIT,
+	ICU_GENBL0_ADDR,
+	11
 };
 #endif
 
@@ -181,7 +195,9 @@ static const SIOPINIB siopinib_sci6 = {
 	(volatile uint8_t *)SCI6_SSR_ADDR,
 	INT_TXI6,
 	INT_RXI6,
-	SYSTEM_MSTPCRB_MSTPB25_BIT
+	SYSTEM_MSTPCRB_MSTPB25_BIT,
+	ICU_GENBL0_ADDR,
+	13
 };
 #endif
 
@@ -198,7 +214,9 @@ static const SIOPINIB siopinib_sci7 = {
 	(volatile uint8_t *)SCI7_SSR_ADDR,
 	INT_TXI7,
 	INT_RXI7,
-	SYSTEM_MSTPCRB_MSTPB24_BIT
+	SYSTEM_MSTPCRB_MSTPB24_BIT,
+	ICU_GENBL0_ADDR,
+	15
 };
 #endif
 
@@ -215,7 +233,9 @@ static const SIOPINIB siopinib_sci8 = {
 	(volatile uint8_t *)SCI8_SSR_ADDR,
 	INT_TXI8,
 	INT_RXI8,
-	SYSTEM_MSTPCRC_MSTPC27_BIT
+	SYSTEM_MSTPCRC_MSTPC27_BIT,
+	ICU_GENBL1_ADDR,
+	25
 };
 #endif
 
@@ -300,6 +320,7 @@ sio_initialize(EXINF exinf)
 {
 	SIOPCB	*p_siopcb;
 	uint_t	i;
+	ER      ercd;
 
 	/*
 	 *  シリアルI/Oポート管理ブロックの初期化
@@ -409,6 +430,19 @@ sio_opn_por(ID siopid, EXINF exinf)
 	 *  必要な場合、serial.cはsio_ena_cbrを使って解除してくれる。
 	 */
 
+	/* エラーフラグをクリア */
+	sil_wrb_mem((void *)p_siopinib->ssrreg,
+		sil_reb_mem((void *)p_siopinib->ssrreg) & 0b11000111);
+
+	/* エラー割り込みマスク解除 */
+	sil_wrw_mem((void *)p_siopinib->erireg,
+		sil_rew_mem((void *)p_siopinib->erireg) | (1 << p_siopinib->eribit));
+
+	ercd = ena_int(INT_GROUPBL0);
+	assert(ercd == E_OK);
+	ercd = ena_int(INT_GROUPBL1);
+	assert(ercd == E_OK);
+
     return (p_siopcb);
 }
 
@@ -435,6 +469,10 @@ sio_cls_por(SIOPCB *p_siopcb)
 	assert(ercd == E_OK);
 	ercd = dis_int(p_siopcb->p_siopinib->rx_intno);
 	assert(ercd == E_OK);
+
+	/* エラー割り込みをマスクする */
+	sil_wrw_mem((void *)p_siopcb->p_siopinib->erireg,
+		sil_rew_mem((void *)p_siopcb->p_siopinib->erireg) & ~(1 << p_siopcb->p_siopinib->eribit));
 }
 
 /*
@@ -579,4 +617,51 @@ target_fput_log( char c )
 	}
 
     uart_pol_putc( c , FPUT_PORTID );
+}
+
+/*
+ *  SIOの割込みハンドラ
+ */
+void sio_isr_eri(EXINF exinf)
+{
+	if (exinf == 0) {
+		if((sil_rew_mem((void *)ICU_GRPBL0_ADDR) & (1 << 1)) != 0){
+			sil_wrb_mem((void *)SCI0_SSR_ADDR,
+				sil_reb_mem((void *)SCI0_SSR_ADDR) & 0b11000111);
+		}
+		if((sil_rew_mem((void *)ICU_GRPBL0_ADDR) & (1 << 3)) != 0){
+			sil_wrb_mem((void *)SCI1_SSR_ADDR,
+				sil_reb_mem((void *)SCI1_SSR_ADDR) & 0b11000111);
+		}
+		if((sil_rew_mem((void *)ICU_GRPBL0_ADDR) & (1 << 5)) != 0){
+			sil_wrb_mem((void *)SCI2_SSR_ADDR,
+				sil_reb_mem((void *)SCI2_SSR_ADDR) & 0b11000111);
+		}
+		if((sil_rew_mem((void *)ICU_GRPBL0_ADDR) & (1 << 7)) != 0){
+			sil_wrb_mem((void *)SCI3_SSR_ADDR,
+				sil_reb_mem((void *)SCI3_SSR_ADDR) & 0b11000111);
+		}
+		if((sil_rew_mem((void *)ICU_GRPBL0_ADDR) & (1 << 9)) != 0){
+			sil_wrb_mem((void *)SCI4_SSR_ADDR,
+				sil_reb_mem((void *)SCI4_SSR_ADDR) & 0b11000111);
+		}
+		if((sil_rew_mem((void *)ICU_GRPBL0_ADDR) & (1 << 11)) != 0){
+			sil_wrb_mem((void *)SCI5_SSR_ADDR,
+				sil_reb_mem((void *)SCI5_SSR_ADDR) & 0b11000111);
+		}
+		if((sil_rew_mem((void *)ICU_GRPBL0_ADDR) & (1 << 13)) != 0){
+			sil_wrb_mem((void *)SCI6_SSR_ADDR,
+				sil_reb_mem((void *)SCI6_SSR_ADDR) & 0b11000111);
+		}
+		if((sil_rew_mem((void *)ICU_GRPBL0_ADDR) & (1 << 15)) != 0){
+			sil_wrb_mem((void *)SCI7_SSR_ADDR,
+				sil_reb_mem((void *)SCI7_SSR_ADDR) & 0b11000111);
+		}
+	}
+	else {
+		if((sil_rew_mem((void *)ICU_GRPBL1_ADDR) & (1 << 25)) != 0){
+			sil_wrb_mem((void *)SCI8_SSR_ADDR,
+				sil_reb_mem((void *)SCI8_SSR_ADDR) & 0b11000111);
+		}
+	}
 }

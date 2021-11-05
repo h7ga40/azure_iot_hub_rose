@@ -59,6 +59,7 @@
 #define SCI1_INTPRI (-4)
 #define SCI3_SIO_ID (2)
 #define SCI3_INTPRI (-4)
+#define ERIX_INTPRI (-4)
 
 #include "prc_serial.h"
 

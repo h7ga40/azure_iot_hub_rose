@@ -77,6 +77,7 @@ extern void sio_cls_por(SIOPCB *p_siopcb);
  */
 extern void sio_isr_rxi(EXINF exinf);
 extern void sio_isr_txi(EXINF exinf);
+extern void sio_isr_eri(EXINF exinf);
 
 /*
  *  シリアルI/Oポートへの文字送信
