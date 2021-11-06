@@ -53,6 +53,7 @@ extern HTTP_PROXY_OPTIONS g_proxy_options;
 typedef struct CLIENT_SAMPLE_INFO_TAG
 {
 	unsigned int sleep_time;
+	unsigned int timeout;
 	char *iothub_uri;
 	char *access_key_name;
 	char *device_key;
@@ -191,7 +192,8 @@ int dps_csgen_main(int argc, char *argv[])
 	memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
 
 	user_ctx.registration_complete = 0;
-	user_ctx.sleep_time = 10;
+	user_ctx.sleep_time = 10;	/* 10ms */
+	user_ctx.timeout = 1000;	/* 10ms * 1000 */
 
 	PROV_DEVICE_LL_HANDLE handle;
 	if ((handle = Prov_Device_LL_Create(global_prov_uri, scope_id, prov_device_protocol)) == NULL)
@@ -220,10 +222,14 @@ int dps_csgen_main(int argc, char *argv[])
 		}
 		else
 		{
+			int timeout = 0;
 			do
 			{
+				if (timeout > user_ctx.timeout)
+					break;
 				Prov_Device_LL_DoWork(handle);
 				ThreadAPI_Sleep(user_ctx.sleep_time);
+				timeout++;
 			} while (user_ctx.registration_complete == 0);
 		}
 		Prov_Device_LL_Destroy(handle);
