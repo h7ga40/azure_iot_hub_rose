@@ -57,6 +57,8 @@ typedef uint32_t in_addr_t;
 struct ether_addr *ether_aton_r(const char *x, struct ether_addr *p_a);
 
 void init_esp_at();
+void set_ssid_pwd(const char *ssid, const char *pwd);
+bool prepare_esp_at();
 
 /*ESPのバッファサイズ*/
 #define AT_CONNECTION_RX_BUFF_SIZE 4096

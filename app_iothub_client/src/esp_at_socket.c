@@ -81,6 +81,7 @@ typedef enum at_parse_state_t {
 	at_string_esc,
 	at_string_edq,
 	at_symbol,
+	at_ipaddr,
 	at_line_text,
 	at_cr,
 	at_crlf,
@@ -352,7 +353,8 @@ at_symbol_kind_t get_symbol(const char *name)
 bool append_char(esp_serial_state_t *esp_state, int c)
 {
 	if (esp_state->string_pos >= sizeof(esp_state->string)) {
-		esp_state->string[0] = '\0';
+		esp_state->string_pos = sizeof(esp_state->string);
+		esp_state->string[sizeof(esp_state->string) - 1] = '\0';
 		return false;
 	}
 
@@ -363,6 +365,9 @@ bool append_char(esp_serial_state_t *esp_state, int c)
 
 bool proc_atc_res(esp_serial_state_t *esp_state, int c)
 {
+#ifdef AT_DEBUG
+	at_parse_state_t prev_state = esp_state->parse_state;
+#endif
 	switch (esp_state->parse_state) {
 	case at_none:
 		if (c == '+') {
@@ -417,12 +422,20 @@ bool proc_atc_res(esp_serial_state_t *esp_state, int c)
 		}
 		break;
 	case at_response:
-		if ((c == '\r') || (c == '.')) {
+		if ((c == '\r') || (c == '\n') || (c == '.')) {
 			append_char(esp_state, '\0');
 			esp_state->response = get_response(esp_state->string);
 			if (esp_state->response != NULL) {
 				esp_state->param_pos = 0;
 				memset(&esp_state->params, 0, sizeof(esp_state->params));
+				if (c == '\n')
+					goto at_crlf_label;
+				esp_state->parse_state = at_crlf;
+				return false;
+			}
+			else {
+				if (c == '\n')
+					goto at_crlf_label;
 				esp_state->parse_state = at_crlf;
 				return false;
 			}
@@ -475,6 +488,13 @@ bool proc_atc_res(esp_serial_state_t *esp_state, int c)
 			esp_state->number += c - '0';
 			return false;
 		}
+		else if (c == '.') {
+			esp_state->string_pos = 0;
+			esp_state->string[0] = '\0';
+			esp_state->string_pos = sprintf(esp_state->string, "%d.", esp_state->number);
+			esp_state->parse_state = at_ipaddr;
+			return false;
+		}
 		else if (c == ',') {
 			esp_state->param_pos++;
 			if (esp_state->response->next_parameter(esp_state, esp_state->param_pos, at_param_number, esp_state->number)) {
@@ -494,9 +514,11 @@ bool proc_atc_res(esp_serial_state_t *esp_state, int c)
 				return true;
 			}
 		}
-		else if (c == '\r') {
+		else if ((c == '\r') || (c == '\n')) {
 			esp_state->param_pos++;
 			if (esp_state->response->next_parameter(esp_state, esp_state->param_pos, at_param_number, esp_state->number)) {
+				if (c == '\n')
+					goto at_crlf_label;
 				esp_state->parse_state = at_crlf;
 				return false;
 			}
@@ -560,6 +582,21 @@ bool proc_atc_res(esp_serial_state_t *esp_state, int c)
 			append_char(esp_state, c);
 			esp_state->parse_state = at_symbol;
 			return false;
+		}
+		break;
+	case at_ipaddr:
+		if (isdigit(c) || (c == '.')) {
+			append_char(esp_state, c);
+			esp_state->parse_state = at_ipaddr;
+			return false;
+		}
+		else if (c == ',') {
+			append_char(esp_state, '\0');
+			esp_state->param_pos++;
+			if (esp_state->response->next_parameter(esp_state, esp_state->param_pos, at_param_string, (intptr_t)esp_state->string)) {
+				esp_state->parse_state = at_parameter;
+				return false;
+			}
 		}
 		break;
 	case at_line_text:
@@ -636,8 +673,10 @@ at_crlf_label:
 	}
 	}
 #ifdef AT_DEBUG
-	if (esp_state->parse_state != at_none)
-		printf("\033[35mparse error. state:%d\033[0m\r\n", esp_state->parse_state);
+	if (esp_state->parse_state != at_none) {
+		append_char(esp_state, '\0');
+		printf("\033[35mparse error. state:%d->%d %s %02x\033[0m\r\n", prev_state, esp_state->parse_state, esp_state->string, (int)c);
+	}
 #endif
 	esp_state->parse_state = at_none;
 	esp_state->response = NULL;
@@ -855,7 +894,7 @@ static bool at_cipsntptime_set_param(esp_serial_state_t *esp_state, int pos, at_
 			return true;
 		}
 		else {
-			printf("strptime error %s\r\n", value);
+			printf("strptime error %s\r\n", (const char *)value);
 		}
 		break;
 	}
