@@ -563,10 +563,12 @@ bool proc_atc_res(esp_serial_state_t *esp_state, int c)
 		}
 		break;
 	case at_line_text:
-		if (c == '\r') {
+		if ((c == '\r') || (c == '\n')) {
 			append_char(esp_state, '\0');
 			esp_state->param_pos++;
 			if (esp_state->response->next_parameter(esp_state, esp_state->param_pos, at_param_symbol, (intptr_t)esp_state->string)) {
+				if (c == '\n')
+					goto at_crlf_label;
 				esp_state->parse_state = at_crlf;
 				return false;
 			}
@@ -584,6 +586,7 @@ bool proc_atc_res(esp_serial_state_t *esp_state, int c)
 		}
 		break;
 	case at_crlf:
+at_crlf_label:
 		if (c == '\n') {
 			if (esp_state->response != NULL) {
 #ifdef AT_DEBUG
@@ -850,6 +853,9 @@ static bool at_cipsntptime_set_param(esp_serial_state_t *esp_state, int pos, at_
 				date_time.tm_hour, date_time.tm_min, date_time.tm_sec);
 			params->date_time = mktime(&date_time);
 			return true;
+		}
+		else {
+			printf("strptime error %s\r\n", value);
 		}
 		break;
 	}
@@ -1510,11 +1516,15 @@ retry:
 		}
 		if (esp_state->current_state.date_time <= MINIMUM_YEAR) {
 			tmo++;
-			if (tmo < 10) {
+			if (tmo <= 10) {
 				printf("retry to get time %s\n", ctime(NULL));
 				dly_tsk(1000 * 1000);
 				esp_state->esp_state = esp_state_get_time;
 				goto retry;
+			}
+			else{
+				printf("get time error retryout\n");
+				break;
 			}
 		}
 		esp_state->esp_state = esp_state_done;
