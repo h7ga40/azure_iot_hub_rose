@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "azure_c_shared_utility/shared_util_options.h"
+#include "esp_at_socket.h"
 
 extern char* connectionString;
 
@@ -252,6 +253,8 @@ int clear_proxy_main(int argc, char **argv)
 	return 0;
 }
 
+extern int use_wifi;
+
 int set_wifi_main(int argc, char **argv)
 {
 	if (argc < 3) {
@@ -260,7 +263,12 @@ int set_wifi_main(int argc, char **argv)
 
 	set_ssid_pwd(argv[1], argv[2]);
 
-	prepare_esp_at();
+	if (!prepare_esp_at()) {
+		use_wifi = 0;
+	}
+	else {
+		use_wifi = 1;
+	}
 
 	return 0;
 }

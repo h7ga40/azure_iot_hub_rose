@@ -53,7 +53,7 @@ int use_wifi = 0;
 
 const IO_INTERFACE_DESCRIPTION* platform_get_default_tlsio(void)
 {
-	if (use_wifi) {
+	if (use_wifi == 2) {
 		return tlsio_esp_at_get_interface_description();
 	}
 	else {
