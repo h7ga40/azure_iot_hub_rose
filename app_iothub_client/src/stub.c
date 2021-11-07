@@ -151,7 +151,7 @@ int rtc_set_time(struct tm *time)
 	while ((sil_reb_mem((uint8_t *)RTC_RCR2_ADDR) & RTC_RCR2_START_BIT) == 0)
 		__asm__ __volatile__ ("nop");
 
-    return 1;
+	return 1;
 }
 
 int rtc_get_time(struct tm *time)
@@ -183,13 +183,15 @@ int rtc_get_time(struct tm *time)
 	return 1;
 }
 
+extern long _timezone;
+
 int gettimeofday (struct timeval *__restrict tp,
 			  void *__restrict tzvp)
 {
 	struct tm timedate;
 	if (!tp) return -1;
 	rtc_get_time(&timedate);
-	time_t time = mktime(&timedate);
+	time_t time = mktime(&timedate) - _timezone;
 	tp->tv_sec = time;
 	tp->tv_usec = 0;
 	return 0;

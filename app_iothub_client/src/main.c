@@ -352,6 +352,9 @@ main_task(EXINF exinf)
 {
 	ER_UINT	ercd;
 
+	setenv("TZ", "JST-9", 1);
+	tzset();
+
 	SVC_PERROR(syslog_msk_log(LOG_UPTO(LOG_NOTICE), LOG_UPTO(LOG_EMERG)));
 	syslog(LOG_NOTICE, "Sample program starts (exinf = %d).", (int_t) exinf);
 
