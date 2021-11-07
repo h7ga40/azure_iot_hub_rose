@@ -33,7 +33,7 @@ Includes   <System Includes> , "Project Includes"
 #include <stdint.h>
 #include <stddef.h>
 
-#define BSP_CFG_HEAP_BYTES              (0x10000)
+#define BSP_CFG_HEAP_BYTES              (0x60000)
 
 /***********************************************************************************************************************
 Macro definitions
