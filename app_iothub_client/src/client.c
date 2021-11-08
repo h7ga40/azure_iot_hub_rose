@@ -131,12 +131,12 @@ static IOTHUBMESSAGE_DISPOSITION_RESULT ReceiveMessageCallback(IOTHUB_MESSAGE_HA
 }
 
 // Define the Model
-BEGIN_NAMESPACE(WeatherStation);
+BEGIN_NAMESPACE(ConectedMouse);
 
-DECLARE_MODEL(ContosoAnemometer,
-WITH_DATA(double, windSpeed),
-WITH_DATA(double, temperature),
-WITH_DATA(double, humidity),
+DECLARE_MODEL(GrRoseMouse,
+WITH_DATA(double, distance),
+WITH_DATA(double, rotation),
+WITH_DATA(int, clickCount),
 WITH_METHOD(quit),
 WITH_METHOD(turnLedOn),
 WITH_METHOD(turnLedOff)
@@ -151,36 +151,36 @@ DECLARE_STRUCT(ThresholdR,
 	ascii_char_ptr, status
 );
 
-DECLARE_DEVICETWIN_MODEL(AnemometerState,
+DECLARE_DEVICETWIN_MODEL(MouseState,
 WITH_REPORTED_PROPERTY(ThresholdR, threshold)
 );
 
-DECLARE_DEVICETWIN_MODEL(AnemometerSettings,
+DECLARE_DEVICETWIN_MODEL(MouseSettings,
 WITH_DESIRED_PROPERTY(ThresholdD, threshold, onDesiredThreshold)
 );
 
-END_NAMESPACE(WeatherStation);
+END_NAMESPACE(ConectedMouse);
 
-void anemometerReportedStateCallback(int status_code, void* userContextCallback)
+void mouseReportedStateCallback(int status_code, void* userContextCallback)
 {
-	AnemometerState *anemometer = (AnemometerState *)userContextCallback;
+	MouseState *mouse = (MouseState *)userContextCallback;
 
-	printf("received states \033[43m%d\033[49m, reported threshold = %.1f\n", status_code, anemometer->threshold.value);
+	printf("received states \033[43m%d\033[49m, reported threshold = %.1f\n", status_code, mouse->threshold.value);
 }
 
 void onDesiredThreshold(void* argument)
 {
 	// Note: The argument is NOT a pointer to threshold, but instead a pointer to the MODEL
 	//       that contains threshold as one of its arguments.  In this case, it
-	//       is AnemometerSettings*.
+	//       is MouseSettings*.
 
-	AnemometerSettings *anemometer = (AnemometerSettings *)argument;
-	printf("received a new desired.threshold = \033[42m%.1f\033[49m\n", anemometer->threshold.value);
+	MouseSettings *mouse = (MouseSettings *)argument;
+	printf("received a new desired.threshold = \033[42m%.1f\033[49m\n", mouse->threshold.value);
 
 	g_twinReport = true;
 }
 
-METHODRETURN_HANDLE quit(ContosoAnemometer* device)
+METHODRETURN_HANDLE quit(GrRoseMouse* device)
 {
 	(void)device;
 	(void)printf("quit with Method.\r\n");
@@ -191,23 +191,23 @@ METHODRETURN_HANDLE quit(ContosoAnemometer* device)
 	return result;
 }
 
-METHODRETURN_HANDLE turnLedOn(ContosoAnemometer* device)
+METHODRETURN_HANDLE turnLedOn(GrRoseMouse* device)
 {
 	(void)device;
 	(void)printf("\033[41mTurning LED on with Method.\033[49m\r\n");
 
-	mouse.ledOn = 1;
+	telemetry.ledOn = 1;
 
 	METHODRETURN_HANDLE result = MethodReturn_Create(1, "{\"Message\":\"Turning fan on with Method\"}");
 	return result;
 }
 
-METHODRETURN_HANDLE turnLedOff(ContosoAnemometer* device)
+METHODRETURN_HANDLE turnLedOff(GrRoseMouse* device)
 {
 	(void)device;
 	(void)printf("\033[44mTurning LED off with Method.\033[49m\r\n");
 
-	mouse.ledOn = 0;
+	telemetry.ledOn = 0;
 
 	METHODRETURN_HANDLE result = MethodReturn_Create(0, "{\"Message\":\"Turning fan off with Method\"}");
 	return result;
@@ -280,7 +280,7 @@ static void SendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result, v
 {
 	EVENT_INSTANCE* eventInstance = (EVENT_INSTANCE*)userContextCallback;
 
-	(void)printf("Confirmation[%d] received for message tracking id = %u with result = %s\r\n", callbackCounter, eventInstance->messageTrackingId, MU_ENUM_TO_STRING(IOTHUB_CLIENT_CONFIRMATION_RESULT, result));
+	(void)printf("Confirmation[%d] received for message tracking id = %zu with result = %s\r\n", callbackCounter, eventInstance->messageTrackingId, MU_ENUM_TO_STRING(IOTHUB_CLIENT_CONFIRMATION_RESULT, result));
 
 	/* Some device specific action code goes here... */
 	callbackCounter++;
@@ -293,9 +293,6 @@ void iothub_client_run(int proto)
 
 	EVENT_INSTANCE messages[MESSAGE_COUNT];
 	int msg_id = 0;
-	double avgWindSpeed = 10.0;
-	double minTemperature = 20.0;
-	double minHumidity = 60.0;
 	int receiveContext = 0;
 
 	g_continueRunning = true;
@@ -313,7 +310,7 @@ void iothub_client_run(int proto)
 		{
 			(void)printf("Failed in serializer_init.");
 		}
-		else if (SERIALIZER_REGISTER_NAMESPACE(WeatherStation) == NULL)
+		else if (SERIALIZER_REGISTER_NAMESPACE(ConectedMouse) == NULL)
 		{
 			LogError("unable to SERIALIZER_REGISTER_NAMESPACE");
 		}
@@ -373,7 +370,8 @@ void iothub_client_run(int proto)
 				{
 					printf("failure to set option \"MinimumPollingTime\"\r\n");
 				}
-
+#endif
+#if 1
 				bool traceOn = 1;
 				if (IoTHubClient_LL_SetOption(iotHubClientHandle, OPTION_LOG_TRACE, &traceOn) != IOTHUB_CLIENT_OK)
 				{
@@ -387,30 +385,30 @@ void iothub_client_run(int proto)
 					printf("failure to set option \"TrustedCerts\"\r\n");
 				}
 #endif // SET_TRUSTED_CERT_IN_SAMPLES
-				AnemometerState *anemometerState = IoTHubDeviceTwin_LL_CreateAnemometerState(iotHubClientHandle);
-				if (anemometerState == NULL)
+				MouseState *mouseState = IoTHubDeviceTwin_LL_CreateMouseState(iotHubClientHandle);
+				if (mouseState == NULL)
 				{
-					printf("Failure in IoTHubDeviceTwin_LL_CreateAnemometerState");
+					printf("Failure in IoTHubDeviceTwin_LL_CreateMouseState");
 				}
 				else
 				{
-					(void)printf("IoTHubDeviceTwin_LL_CreateAnemometerState...successful.\r\n");
+					(void)printf("IoTHubDeviceTwin_LL_CreateMouseState...successful.\r\n");
 				}
-				AnemometerSettings *anemometerSettings = IoTHubDeviceTwin_LL_CreateAnemometerSettings(iotHubClientHandle);
-				if (anemometerSettings == NULL)
+				MouseSettings *mouseSettings = IoTHubDeviceTwin_LL_CreateMouseSettings(iotHubClientHandle);
+				if (mouseSettings == NULL)
 				{
-					printf("Failure in IoTHubDeviceTwin_LL_CreateAnemometerSettings");
+					printf("Failure in IoTHubDeviceTwin_LL_CreateMouseSettings");
 				}
 				else
 				{
-					(void)printf("IoTHubDeviceTwin_LL_CreateAnemometerSettings...successful.\r\n");
+					(void)printf("IoTHubDeviceTwin_LL_CreateMouseSettings...successful.\r\n");
 				}
-				ContosoAnemometer* myWeather = CREATE_MODEL_INSTANCE(WeatherStation, ContosoAnemometer);
-				if (myWeather == NULL)
+				GrRoseMouse* myMouse = CREATE_MODEL_INSTANCE(ConectedMouse, GrRoseMouse);
+				if (myMouse == NULL)
 				{
 					(void)printf("Failed on CREATE_MODEL_INSTANCE\r\n");
 				}
-				else if (IoTHubClient_LL_SetDeviceMethodCallback(iotHubClientHandle, ReceiveDeviceMethodCallback, myWeather) != IOTHUB_CLIENT_OK)
+				else if (IoTHubClient_LL_SetDeviceMethodCallback(iotHubClientHandle, ReceiveDeviceMethodCallback, myMouse) != IOTHUB_CLIENT_OK)
 				{
 					(void)printf("ERROR: IoTHubClient_LL_SetDeviceMethodCallback..........FAILED!\r\n");
 				}
@@ -438,10 +436,10 @@ void iothub_client_run(int proto)
 						int msgPos = msg_id % MESSAGE_COUNT;
 						unsigned char *msgText;
 						size_t msgSize;
-						myWeather->windSpeed = avgWindSpeed + (rand() % 4 + 2);
-						myWeather->temperature = mouse.temperature;
-						myWeather->humidity = minHumidity + (rand() % 20);
-						if (SERIALIZE(&msgText, &msgSize, myWeather->windSpeed, myWeather->temperature, myWeather->humidity) != CODEFIRST_OK)
+						myMouse->distance = telemetry.distance;
+						myMouse->rotation = telemetry.rotation;
+						myMouse->clickCount = telemetry.clickCount;
+						if (SERIALIZE(&msgText, &msgSize, myMouse->distance, myMouse->rotation, myMouse->clickCount) != CODEFIRST_OK)
 						{
 							(void)printf("Failed to serialize\r\n");
 						}
@@ -457,8 +455,8 @@ void iothub_client_run(int proto)
 							messages[msgPos].messageTrackingId = msg_id;
 
 							propMap = IoTHubMessage_Properties(messages[msgPos].messageHandle);
-							(void)sprintf_s(propText, sizeof(propText), myWeather->temperature > anemometerSettings->threshold.value ? "true" : "false");
-							if (Map_AddOrUpdate(propMap, "temperatureAlert", propText) != MAP_OK)
+							(void)sprintf_s(propText, sizeof(propText), myMouse->rotation > mouseSettings->threshold.value ? "true" : "false");
+							if (Map_AddOrUpdate(propMap, "rotationAlert", propText) != MAP_OK)
 							{
 								(void)printf("ERROR: Map_AddOrUpdate Failed!\r\n");
 							}
@@ -483,9 +481,9 @@ void iothub_client_run(int proto)
 					}
 					else if (g_twinReport) {
 						g_twinReport = false;
-						anemometerState->threshold.value = anemometerSettings->threshold.value;
-						anemometerState->threshold.status = "success";
-						IoTHubDeviceTwin_LL_SendReportedStateAnemometerState(anemometerState, anemometerReportedStateCallback, anemometerState);
+						mouseState->threshold.value = mouseSettings->threshold.value;
+						mouseState->threshold.status = "success";
+						IoTHubDeviceTwin_LL_SendReportedStateMouseState(mouseState, mouseReportedStateCallback, mouseState);
 					}
 					iterator++;
 
@@ -501,12 +499,12 @@ void iothub_client_run(int proto)
 					ThreadAPI_Sleep(1);
 				}
 
-				if (anemometerSettings != NULL)
-					IoTHubDeviceTwin_LL_DestroyAnemometerSettings(anemometerSettings);
-				if (anemometerState != NULL)
-					IoTHubDeviceTwin_LL_DestroyAnemometerState(anemometerState);
-				if (myWeather != NULL)
-					DESTROY_MODEL_INSTANCE(myWeather);
+				if (mouseSettings != NULL)
+					IoTHubDeviceTwin_LL_DestroyMouseSettings(mouseSettings);
+				if (mouseState != NULL)
+					IoTHubDeviceTwin_LL_DestroyMouseState(mouseState);
+				if (myMouse != NULL)
+					DESTROY_MODEL_INSTANCE(myMouse);
 				IoTHubClient_LL_Destroy(iotHubClientHandle);
 			}
 			serializer_deinit();

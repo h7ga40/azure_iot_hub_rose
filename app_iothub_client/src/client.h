@@ -5,15 +5,15 @@
 extern "C" {
 #endif
 
-struct mouse_t
+struct telemetry_t
 {
 	int ledOn;
-	int windSpeed;
-	int temperature;
-	int humidity;
+	float distance;
+	float rotation;
+	int clickCount;
 };
 
-extern struct mouse_t mouse;
+extern struct telemetry_t telemetry;
 
 void iothub_client_init(void);
 int iothub_client_main(int argc, char **argv);

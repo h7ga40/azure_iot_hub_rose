@@ -70,7 +70,8 @@ try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00
 
 #include <kernel.h>
 #include <time.h>
-#include "arduino.h"
+#include <math.h>
+#include <arduino.h>
 
 #include "iodefine.h"
 
@@ -87,6 +88,7 @@ try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00
 #include "lwip/apps/sntp.h"
 #include "lwip/apps/httpd.h"
 #include "adns5050.h"
+#include "client.h"
 
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF PROTYPES
@@ -96,7 +98,7 @@ try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00
 #define ENC_B 6
 
 uint8_t keycode[6] = { 0 };
-adns5050_t mouse;
+adns5050_t adns5050;
 int8_t delta_x;
 int8_t delta_y;
 uint8_t encoder;
@@ -104,14 +106,19 @@ int8_t vertical;
 int8_t horizontal;
 uint8_t button_mask;
 
+// for telemetry
+struct telemetry_t telemetry;
+unsigned int telemetry_reset;
+
 void hid_task(void);
 void enc_a_changed(void);
 void enc_b_changed(void);
 void board_init(void);
 
+#ifdef LAN_ADAPTOR
 /* lwip context */
 static struct netif netif_data;
-
+#endif
 /* shared between tud_network_recv_cb() and service_traffic() */
 static struct pbuf *received_frame;
 
@@ -119,6 +126,7 @@ static struct pbuf *received_frame;
 /* ideally speaking, this should be generated from the hardware's unique ID (if available) */
 /* it is suggested that the first byte is 0x02 to indicate a link-local address */
 const uint8_t tud_network_mac_address[6] = {0x02,0x02,0x84,0x6A,0x96,0x00};
+#ifdef LAN_ADAPTOR
 static ip_addr_t ipaddr, netmask, gateway;
 
 static err_t linkoutput_fn(struct netif *netif, struct pbuf *p)
@@ -132,7 +140,7 @@ static err_t linkoutput_fn(struct netif *netif, struct pbuf *p)
       return ERR_USE;
 
     /* if the network driver can accept another packet, we make it happen */
-    if (tud_network_can_xmit())
+    if (tud_network_can_xmit(p->tot_len))
     {
       tud_network_xmit(p, 0 /* unused for this example */);
       break;
@@ -181,7 +189,7 @@ static void netif_status_callback(struct netif *nif)
 		mdns_resp_netif_settings_changed(nif);
 #endif
 }
-#ifdef LAN_ADAPTOR
+
 static void init_lwip(void)
 {
   struct netif *netif = &netif_data;
@@ -253,12 +261,14 @@ static void service_traffic(void)
 #endif
 void tud_network_init_cb(void)
 {
+#ifdef LAN_ADAPTOR
   /* if the network is re-initializing and we have a leftover packet, we must do a cleanup */
   if (received_frame)
   {
     pbuf_free(received_frame);
     received_frame = NULL;
   }
+#endif
 }
 
 /*------------- MAIN -------------*/
@@ -278,13 +288,13 @@ void setup(void)
 
   encoder = 0;
 
-  adns5050_init(&mouse, 11, 13, 10);
+  adns5050_init(&adns5050, 11, 13, 10);
   pinMode(12, OUTPUT);
   digitalWrite(12, HIGH);
 
-  adns5050_begin(&mouse);
+  adns5050_begin(&adns5050);
   delay(1);
-  adns5050_sync(&mouse);
+  adns5050_sync(&adns5050);
 
   tusb_init();
 #ifdef LAN_ADAPTOR
@@ -342,8 +352,8 @@ void hid_task(void)
   const uint32_t interval_ms = 10;
   static uint32_t start_ms = 0;
 
-  delta_y += adns5050_read(&mouse, ADNS5050_DELTA_X_REG);
-  delta_x -= adns5050_read(&mouse, ADNS5050_DELTA_Y_REG);
+  delta_y += adns5050_read(&adns5050, ADNS5050_DELTA_X_REG);
+  delta_x -= adns5050_read(&adns5050, ADNS5050_DELTA_Y_REG);
 
   if (digitalRead(20) == 0)
 	button_mask |= MOUSE_BUTTON_LEFT;
@@ -354,7 +364,11 @@ void hid_task(void)
   else
 	button_mask &= ~MOUSE_BUTTON_RIGHT;
 
-  if ( millis() - start_ms < interval_ms) return; // not enough time
+  if (millis() - start_ms < interval_ms) {
+    // not enough time
+    delay(1000);
+    return;
+  }
   start_ms += interval_ms;
 
   //printf("delta_x:%d, delta_y:%d, vertical:%d, buttons:%x\r\n", delta_x, delta_y, vertical, button_mask);
@@ -399,6 +413,17 @@ void hid_task(void)
     {
       uint8_t const report_id   = 0;
       tud_hid_n_mouse_report(ITF_NUM_MOUSE, report_id, button_mask, delta_x, delta_y, vertical, horizontal);
+
+      if (telemetry_reset != 0) {
+        telemetry_reset = 0;
+        telemetry.distance = telemetry.rotation = 0;
+        telemetry.clickCount = 0;
+      }
+      telemetry.distance += sqrt((float)delta_x * (float)delta_x + (float)delta_y * (float)delta_y);
+      telemetry.rotation += sqrt((float)vertical * (float)vertical + (float)horizontal * (float)horizontal);
+      if (button_mask != 0)
+        telemetry.clickCount++;
+
       button_mask = delta_x = delta_y = vertical = horizontal = 0;
     }
   }
