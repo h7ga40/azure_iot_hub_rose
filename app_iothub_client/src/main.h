@@ -69,7 +69,7 @@
 #define	STACK_SIZE		2048		/* タスクのスタックサイズ */
 #endif /* STACK_SIZE */
 
-#define NTSHELL_STACK_SIZE	4096	/* シェルタスクのスタックサイズ */
+#define NTSHELL_STACK_SIZE	16384	/* シェルタスクのスタックサイズ */
 /*
  *  シリアル設定情報
  */
@@ -102,5 +102,7 @@ typedef struct queue_s {
  *  関数のプロトタイプ宣言
  */
 extern void	main_task(intptr_t exinf);
+extern int rtc_get_time(struct tm *time);
+extern int rtc_set_time(struct tm *time);
 
 #endif /* TOPPERS_MACRO_ONLY */
