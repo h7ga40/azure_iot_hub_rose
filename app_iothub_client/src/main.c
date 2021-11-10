@@ -85,6 +85,7 @@
 #include "kernel_cfg.h"
 #include "client.h"
 #include "ntshell_main.h"
+#include <time.h>
 #include "main.h"
 
 #include "lwip/opt.h"
@@ -167,28 +168,16 @@ unsigned char debug_flags;
 
 static void init_netifs(void);
 
-/*
- * gmtime_r関数
- */
-struct tm *gmtime_r(const time_t *pt, struct tm *ptm);
-
 void
 sntp_set_system_time(u32_t sec)
 {
-	struct tm current_time_val;
+	struct tm current_time_val = { 0 };
 	time_t current_time = (time_t)sec;
 
 	gmtime_r(&current_time, &current_time_val);
 	rtc_set_time((struct tm *)&current_time_val);
 
-	current_time = 0;
-	memset(&current_time_val, 0, sizeof(current_time_val));
-
 	current_time = time(NULL);
-	//gmtime_r(&current_time, &current_time_val);
-	//printf("%04d/%02d/%02d %02d:%02d:%02d\n",
-	//	current_time_val.tm_year+1900, current_time_val.tm_mon+1, current_time_val.tm_mday,
-	//	current_time_val.tm_hour, current_time_val.tm_min, current_time_val.tm_sec);
 	printf("%s\n", ctime(&current_time));
 }
 

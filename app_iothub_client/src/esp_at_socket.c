@@ -63,6 +63,7 @@
 
 //#define AT_DEBUG
 time_t MINIMUM_YEAR;
+long long __tm_to_secs(const struct tm *tm);
 
 typedef enum at_param_type_t {
 	at_param_number,
@@ -314,7 +315,7 @@ void init_esp_at()
         0,  /* tm_mon */
         2020 - 1900,  /* tm_year */
 	};
-	MINIMUM_YEAR = mktime(&tm);
+	MINIMUM_YEAR = __tm_to_secs(&tm);
 
 	esp_serial_state.current_state.wifi_mode = at_wifi_mode_station;
 	esp_serial_state.dtqid = DTQ_ESP_AT;
@@ -890,7 +891,7 @@ static bool at_cipsntptime_set_param(esp_serial_state_t *esp_state, int pos, at_
 			printf("%04d/%02d/%02d %02d:%02d:%02d\r\n",
 				date_time.tm_year+1900, date_time.tm_mon+1, date_time.tm_mday,
 				date_time.tm_hour, date_time.tm_min, date_time.tm_sec);
-			params->date_time = mktime(&date_time);
+			params->date_time = __tm_to_secs(&date_time);
 			return true;
 		}
 		else {
@@ -1540,7 +1541,7 @@ retry:
 		}
 		esp_state->esp_state = esp_state_update_time;
 	case esp_state_update_time:
-		sprintf(temp, "AT+CIPSNTPCFG=%d,%d,\"%s\"\r\n", 1, 9, "ntp.nict.jp");
+		sprintf(temp, "AT+CIPSNTPCFG=%d,%d,\"%s\"\r\n", 1, 0, "ntp.nict.jp");
 		ret = esp_serial_write(esp_state, temp, &res_kind, 10000);
 		if ((ret != E_OK) || (res_kind != at_response_kind_ok)) {
 			printf("ntp config error %s %d\n", itron_strerror(ret), res_kind);
